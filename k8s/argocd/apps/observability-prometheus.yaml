@@ -20,10 +20,10 @@ spec:
       releaseName: prometheus
       valueFiles:
       - $values/k8s/observability/prometheus/values.yaml
-  - repoURL: REPO_URL
+  - repoURL: https://github.com/AnderNoleon/kubelab.git
     targetRevision: main
     ref: values
-  - repoURL: REPO_URL
+  - repoURL: https://github.com/AnderNoleon/kubelab.git
     targetRevision: main
     path: k8s/observability/prometheus/manifests
   destination:

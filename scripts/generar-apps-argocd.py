@@ -3,7 +3,7 @@
 Se deja en el repo para documentar cómo se construyeron; si cambian algo, edítenlo aquí y vuelvan a correrlo."""
 import os, yaml
 
-REPO = "REPO_URL"
+REPO = "https://github.com/AnderNoleon/kubelab.git"
 OUT = os.path.join(os.path.dirname(__file__), "..", "k8s", "argocd", "apps")
 RETRY = {"limit": 10, "backoff": {"duration": "20s", "factor": 2, "maxDuration": "5m"}}
 

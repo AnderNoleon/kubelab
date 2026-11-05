@@ -20,10 +20,10 @@ spec:
       releaseName: grafana
       valueFiles:
       - $values/k8s/observability/grafana/values.yaml
-  - repoURL: REPO_URL
+  - repoURL: https://github.com/AnderNoleon/kubelab.git
     targetRevision: main
     ref: values
-  - repoURL: REPO_URL
+  - repoURL: https://github.com/AnderNoleon/kubelab.git
     targetRevision: main
     path: k8s/observability/grafana/manifests
   destination:

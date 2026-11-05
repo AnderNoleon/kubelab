@@ -20,7 +20,7 @@ spec:
       releaseName: traefik
       valueFiles:
       - $values/k8s/platform/traefik/values.yaml
-  - repoURL: REPO_URL
+  - repoURL: https://github.com/AnderNoleon/kubelab.git
     targetRevision: main
     ref: values
   destination:

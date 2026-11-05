@@ -9,7 +9,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: REPO_URL
+    repoURL: https://github.com/AnderNoleon/kubelab.git
     targetRevision: main
     path: k8s/argocd/apps
   destination:
