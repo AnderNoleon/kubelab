@@ -25,7 +25,7 @@ spec:
       containers:
         - name: web
           # El pipeline de CI/CD reescribe esta línea con el hash corto del commit. No editar a mano.
-          image: DOCKERHUB_USER/kubelab-web:inicial
+          image: andernoleo/kubelab-web:5e46bde
           ports:
             - { name: http, containerPort: 8080 }
           resources:
