@@ -1,6 +1,6 @@
 # Valores del chart de Traefik (NET-02, NET-03, NET-04)
 deployment:
-  replicas: 2
+  replicas: 1   # una sola réplica para ahorrar memoria (host de 6 GB)
 
 service:
   # El chart crea el Service como LoadBalancer; MetalLB le asigna esta IP fija
@@ -30,5 +30,5 @@ ingressRoute:
     enabled: false
 
 resources:
-  requests: { cpu: 50m, memory: 64Mi }
-  limits: { memory: 256Mi }
+  requests: { cpu: 25m, memory: 48Mi }
+  limits: { memory: 192Mi }

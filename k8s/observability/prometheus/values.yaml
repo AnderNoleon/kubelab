@@ -8,16 +8,22 @@ prometheus-pushgateway:
 
 kube-state-metrics:
   enabled: true
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { memory: 128Mi }
 prometheus-node-exporter:
   enabled: true
+  resources:
+    requests: { cpu: 10m, memory: 16Mi }
+    limits: { memory: 64Mi }
 
 server:
-  retention: 7d
+  retention: 2d               # poco historial: el host tiene 6 GB de RAM
   persistentVolume:
     enabled: true            # PVC en la StorageClass por defecto (nfs-client)
-    size: 8Gi
+    size: 4Gi
   resources:
-    requests: { cpu: 100m, memory: 384Mi }
-    limits: { memory: 1Gi }
+    requests: { cpu: 50m, memory: 160Mi }
+    limits: { memory: 640Mi }
   global:
     scrape_interval: 15s

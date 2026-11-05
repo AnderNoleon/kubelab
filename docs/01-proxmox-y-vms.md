@@ -4,23 +4,22 @@
 
 | VM ID | Nombre | Rol | IP | vCPU | RAM | Disco | Sistema |
 |---|---|---|---|---|---|---|---|
-| 110 | k8s-cp | control plane | 10.10.10.10 | 2 | 4 GB | 40 GB | Ubuntu 24.04 (cloud image) |
-| 111 | k8s-w1 | worker | 10.10.10.11 | 2 | 4 GB | 40 GB | Ubuntu 24.04 (cloud image) |
-| 112 | k8s-w2 | worker | 10.10.10.12 | 2 | 4 GB | 40 GB | Ubuntu 24.04 (cloud image) |
-| 113 | k8s-w3 | worker | 10.10.10.13 | 2 | 4 GB | 40 GB | Ubuntu 24.04 (cloud image) |
+| 110 | k8s-cp | control plane | 10.10.10.10 | 2 | 1.25 GB | 25 GB | Ubuntu 24.04 (cloud image) + k3s |
+| 111 | k8s-w1 | worker | 10.10.10.11 | 2 | 1.5 GB | 25 GB | Ubuntu 24.04 (cloud image) + k3s |
+| 112 | k8s-w2 | worker | 10.10.10.12 | 2 | 1.5 GB | 25 GB | Ubuntu 24.04 (cloud image) + k3s |
 | 9000 | ubuntu-2404-plantilla | plantilla cloud-init | — | 2 | — | — | Ubuntu 24.04 (cloud image) |
 
-Si el host tiene 16 GB de RAM, usen `RAM_WORKER=3072` al crear las VMs.
+Host físico: Intel Core i5-3470S (4 núcleos, 2.9 GHz), 5.66 GB de RAM, disco de **COMPLETAR** GB · Proxmox VE 9.2 · hostname `proxmox.grupo7.lab` · IP `192.168.101.50` (cable, `vmbr0`).
 
-Host físico: **COMPLETAR** (modelo, CPU, RAM, disco) · Proxmox VE 9.2 · IP en la red del grupo: **COMPLETAR**.
+Por la RAM disponible se usan 2 workers (acordado con el docente). Con 1 solo worker: `WORKERS=1 RAM_WORKER=2560`. Si el host tuviera más RAM, se puede subir `RAM_WORKER`.
 
 ## 1.1 Instalar Proxmox VE (INF-01)
 
 1. Grabar la ISO de Proxmox VE 9.2 en una USB (balenaEtcher o Rufus en modo DD).
 2. En la BIOS: activar la virtualización (VT-x/AMD-V) y arrancar desde la USB.
-3. **Install Proxmox VE (Graphical)**, disco completo, zona horaria America/Guatemala, hostname `pve.grupo7.lab`.
+3. **Install Proxmox VE (Graphical)**, disco completo, zona horaria America/Guatemala, hostname `proxmox.grupo7.lab`.
 4. Red de instalación: la tarjeta cableada (o un celular con *USB tethering*, porque el instalador no configura WiFi).
-5. Repositorios: **Datacenter → pve → Updates → Repositories**: desactivar `enterprise`, agregar `No-Subscription`, y `apt update && apt full-upgrade -y`.
+5. Repositorios: **Datacenter → proxmox → Updates → Repositories**: desactivar `enterprise`, agregar `No-Subscription`, y `apt update && apt full-upgrade -y`.
 6. Si el host sale a Internet por WiFi: `apt install wpasupplicant iw` y agregar a `/etc/network/interfaces`:
 
    ```
@@ -34,10 +33,11 @@ Host físico: **COMPLETAR** (modelo, CPU, RAM, disco) · Proxmox VE 9.2 · IP en
 
 ## 1.2 Red del laboratorio
 
-Una tarjeta WiFi no puede ser puente (bridge) de VMs, así que el clúster vive en una red interna con NAT:
+El clúster vive en una red interna con NAT. Así no ocupa IPs de la red del grupo y funciona igual con cable o WiFi:
 
 ```bash
-bash scripts/proxmox/red-proxmox.sh wlp2s0     # o vmbr0 si el host está por cable
+bash scripts/proxmox/red-proxmox.sh vmbr0      # interfaz con Internet (cable). Por WiFi sería p. ej. wlp3s0
+bash scripts/proxmox/publicar-servicios.sh     # reenvía los puertos 80 y 5432 de Proxmox a Traefik
 ```
 
 Crea `vmbr1` con la IP `10.10.10.1/24` (la puerta de enlace de los nodos) y la regla de NAT.
@@ -50,13 +50,13 @@ bash scripts/proxmox/servidor-nfs.sh
 
 Exporta `/srv/nfs/kubelab` a `10.10.10.0/24`. Lo usa el aprovisionador `nfs-subdir-external-provisioner` (ver `docs/06-observabilidad-y-ha.md`).
 
-## 1.4 Plantilla con cloud-init y clonación de los 4 nodos (INF-02, INF-03)
+## 1.4 Plantilla con cloud-init y clonación de los nodos (INF-02, INF-03)
 
 En la Shell de Proxmox, con el repo clonado (`apt install git && git clone <repo>`):
 
 ```bash
 bash scripts/proxmox/crear-vms.sh
-# opcional: STORAGE=local-zfs RAM_WORKER=3072 CLAVE_VM=algo bash scripts/proxmox/crear-vms.sh
+# opcional: WORKERS=1 RAM_WORKER=2560  STORAGE=local-zfs  CLAVE_VM=algo
 ```
 
 Qué hace, paso a paso (equivalente a hacerlo en la interfaz web):
@@ -67,8 +67,8 @@ Qué hace, paso a paso (equivalente a hacerlo en la interfaz web):
 4. Importa la imagen como disco `scsi0` y agrega el disco de cloud-init (`ide2`).
 5. Configura cloud-init: usuario `kube`, llave SSH del host, DNS `8.8.8.8`, dominio `grupo7.lab`.
 6. La convierte en plantilla.
-7. Por cada nodo: **Full Clone**, RAM según la tabla, IP fija con `ipconfig0` (gateway 10.10.10.1), arranque automático, disco ampliado a 40 GB y encendido.
-8. Espera a que los 4 respondan por SSH.
+7. Por cada nodo: **Full Clone**, RAM según la tabla, IP fija con `ipconfig0` (gateway 10.10.10.1), arranque automático, disco ampliado a 25 GB y encendido.
+8. Espera a que todos respondan por SSH.
 
 El hostname de cada VM lo pone cloud-init con el nombre de la VM. Comprobar: `ssh kube@10.10.10.11 hostname`.
 
@@ -78,4 +78,4 @@ El hostname de cada VM lo pone cloud-init con el nombre de la VM. Comprobar: `ss
 bash scripts/proxmox/preparar-nodos.sh
 ```
 
-Ejecuta `scripts/nodos/preparar-nodo.sh` en los 4 nodos: desactiva swap, carga `overlay` y `br_netfilter`, instala containerd (cgroup systemd), `nfs-common`, y kubeadm/kubelet/kubectl v1.36.
+Ejecuta `scripts/nodos/preparar-nodo.sh` en los 3 nodos: desactiva swap, instala `nfs-common` (para los volúmenes NFS) y registra los nombres de los nodos. k3s trae su propio containerd, así que no hace falta instalarlo aparte.

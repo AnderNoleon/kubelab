@@ -13,8 +13,8 @@ deploymentStrategy:
   type: Recreate
 
 resources:
-  requests: { cpu: 50m, memory: 128Mi }
-  limits: { memory: 384Mi }
+  requests: { cpu: 25m, memory: 80Mi }
+  limits: { memory: 256Mi }
 
 testFramework:
   enabled: false

@@ -8,16 +8,16 @@ flowchart LR
     DP["Doppler<br/>kubelab / prd"]
   end
 
-  DOC["Laptop del docente<br/>Tailscale + hosts.txt"]
+  DOC["Computadora del docente<br/>hosts.txt"]
 
   subgraph PVE["Computadora física · Proxmox VE"]
     NFS[("NFS<br/>/srv/nfs/kubelab")]
     TS["Tailscale<br/>subnet router"]
+    DNAT["DNAT :80 :5432<br/>192.168.101.50"]
     subgraph RED["Red del laboratorio 10.10.10.0/24 (vmbr1)"]
       CP["k8s-cp<br/>control plane"]
       W1["k8s-w1"]
       W2["k8s-w2"]
-      W3["k8s-w3"]
       LB{{"MetalLB<br/>10.10.10.200"}}
       TR["Traefik<br/>IngressRoute / IngressRouteTCP"]
       APPS["web · api · postgres"]
@@ -32,7 +32,8 @@ flowchart LR
   ARGO -- "lee k8s/ (solo lectura)" --> GH
   DOPOP -- "lee secretos" --> DP
   GH -- "CLI de Doppler" --> DP
-  DOC -- "VPN" --> TS --> LB --> TR
+  DOC -- "misma red + hosts" --> DNAT --> LB --> TR
+  DOC -. "o VPN" .-> TS --> LB
   TR --> APPS
   TR --> OBS
   TR --> ARGO

@@ -1,10 +1,15 @@
 # Grupo 7 - KubeLab
 # Copiar al final de /etc/hosts (Linux/macOS) o C:\Windows\System32\drivers\etc\hosts (Windows).
-# Requiere estar conectado a la VPN del grupo (Tailscale), ver docs/03-red-metallb-vpn.md
-# 10.10.10.200 = IP que MetalLB asigna a Traefik
-10.10.10.200 app.grupo7.lab
-10.10.10.200 api.grupo7.lab
-10.10.10.200 db.grupo7.lab
-10.10.10.200 grafana.grupo7.lab
-10.10.10.200 prometheus.grupo7.lab
-10.10.10.200 argocd.grupo7.lab
+#
+# Opción A (computadoras en la misma red que Proxmox): IP de Proxmox.
+# Proxmox reenvía los puertos 80 y 5432 a Traefik (scripts/proxmox/publicar-servicios.sh).
+# Si Proxmox cambia de IP en otra red, solo hay que cambiar este número en las 6 líneas.
+192.168.101.50 app.grupo7.lab
+192.168.101.50 api.grupo7.lab
+192.168.101.50 db.grupo7.lab
+192.168.101.50 grafana.grupo7.lab
+192.168.101.50 prometheus.grupo7.lab
+192.168.101.50 argocd.grupo7.lab
+#
+# Opción B (desde fuera, con la VPN Tailscale): usar la IP de MetalLB en vez de la de Proxmox.
+# 10.10.10.200 app.grupo7.lab   (y lo mismo para los otros 5 dominios)

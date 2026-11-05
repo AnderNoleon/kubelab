@@ -1,0 +1,24 @@
+# Modo liviano: se apagan los componentes de Argo CD que este proyecto no usa.
+#   dex-server              inicio de sesión con GitHub/LDAP (usamos cuentas locales)
+#   notifications-controller notificaciones a Slack/correo
+#   applicationset-controller generador de Applications (usamos app of apps)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-dex-server
+spec:
+  replicas: 0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-notifications-controller
+spec:
+  replicas: 0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-applicationset-controller
+spec:
+  replicas: 0

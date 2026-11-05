@@ -10,7 +10,7 @@
 |---|---|---|---|
 | PostgreSQL | StatefulSet | `datos-postgres-0` | 5 Gi |
 | Loki | StatefulSet | `datos-loki-0` | 5 Gi |
-| Prometheus | Deployment (chart) | `prometheus-server` | 8 Gi |
+| Prometheus | Deployment (chart) | `prometheus-server` | 4 Gi |
 | Grafana | Deployment (chart) | `grafana` | 2 Gi |
 
 Prueba de persistencia:
@@ -25,12 +25,12 @@ curl http://api.grupo7.lab/productos     # "Prueba" sigue ahí
 ## Observabilidad (OBS-01 a OBS-04)
 
 - **Prometheus** (chart 29.40.3) recolecta:
-  - de los nodos: node-exporter, DaemonSet en los 4 nodos;
+  - de los nodos: node-exporter, DaemonSet en los 3 nodos;
   - de Kubernetes: kube-state-metrics, kubelet y cAdvisor;
   - de la API: los pods con la anotación `prometheus.io/scrape: "true"` en el puerto 3000, ruta `/metrics`.
 
   Se verifica en http://prometheus.grupo7.lab/targets.
-- **Loki** (monolítico, PVC) y **Promtail** (DaemonSet, también en el control plane, con toleration). Se verifica con `kubectl get pods -n monitoring -l app=promtail -o wide`: debe haber 4 pods, uno por nodo.
+- **Loki** (monolítico, PVC) y **Promtail** (DaemonSet, también en el control plane, con toleration). Se verifica con `kubectl get pods -n monitoring -l app=promtail -o wide`: debe haber 3 pods, uno por nodo.
 - **Grafana** (chart 14.3.0): las fuentes Prometheus y Loki se definen en `values.yaml`, y el dashboard `KubeLab · Grupo 7` se carga desde `k8s/observability/grafana/manifests/dashboards/kubelab.json` con el sidecar. No hay nada configurado a mano.
 
 Paneles del dashboard: peticiones por segundo, réplicas disponibles de api y web, nodos Ready, solicitudes por segundo por ruta y código, latencia p95, CPU y memoria por pod, réplicas activas frente al objetivo del HPA, CPU de los nodos y logs de Loki.

@@ -1,12 +1,12 @@
 # KubeLab · Grupo 7
 
-Plataforma Kubernetes sobre Proxmox con GitOps: clúster kubeadm de 4 nodos, una API y una web de inventario con PostgreSQL, despliegue automático con GitHub Actions y Argo CD, observabilidad con Prometheus, Loki, Promtail y Grafana, y secretos gestionados en Doppler.
+Plataforma Kubernetes sobre Proxmox con GitOps: clúster k3s de 3 nodos (1 control plane + 2 workers), una API y una web de inventario con PostgreSQL, despliegue automático con GitHub Actions y Argo CD, observabilidad con Prometheus, Loki, Promtail y Grafana, y secretos gestionados en Doppler.
 
-Integrantes: **COMPLETAR** · Docente: **COMPLETAR** (colaborador del repositorio)
+Integrantes: **Anderson** y **Dennys** · Docente: **COMPLETAR** (colaborador del repositorio)
 
 ## URLs (ACC-04)
 
-Requisitos: estar conectado a la VPN (Tailscale) y tener [`docs/hosts.txt`](docs/hosts.txt) en el archivo hosts. Ver [docs/03-red-metallb-vpn.md](docs/03-red-metallb-vpn.md).
+Requisitos: estar en la misma red que Proxmox (`192.168.101.50`) y tener [`docs/hosts.txt`](docs/hosts.txt) en el archivo hosts. Desde fuera de esa red se entra con la VPN (Tailscale). Ver [docs/03-red-metallb-vpn.md](docs/03-red-metallb-vpn.md).
 
 | URL | Servicio | Qué se debe ver |
 |---|---|---|
@@ -26,12 +26,11 @@ Las credenciales de solo lectura (base de datos, Grafana y Argo CD) se entregan 
 Ver [docs/arquitectura.md](docs/arquitectura.md) (diagrama y tabla de componentes).
 
 ```
-Computadora física ── Proxmox VE 9.2 ── red 10.10.10.0/24 (vmbr1, NAT) ── NFS + Tailscale en el host
-   ├── k8s-cp  10.10.10.10   control plane
+Computadora física (192.168.101.50) ── Proxmox VE 9.2 ── red 10.10.10.0/24 (vmbr1, NAT) ── NFS + Tailscale en el host
+   ├── k8s-cp  10.10.10.10   control plane (k3s server, taint NoSchedule)
    ├── k8s-w1  10.10.10.11   worker
-   ├── k8s-w2  10.10.10.12   worker
-   └── k8s-w3  10.10.10.13   worker
-MetalLB 10.10.10.200 → Traefik → app / api / db / grafana / prometheus / argocd .grupo7.lab
+   └── k8s-w2  10.10.10.12   worker
+Navegador → 192.168.101.50:80/5432 (DNAT) → MetalLB 10.10.10.200 → Traefik → app / api / db / grafana / prometheus / argocd .grupo7.lab
 GitHub (código + manifiestos) → Actions → Docker Hub (:hash) → commit del tag → Argo CD → clúster
 Doppler (kubelab/prd) → Doppler Operator → Secrets · Doppler → GitHub Actions
 ```
@@ -40,10 +39,11 @@ Doppler (kubelab/prd) → Doppler Operator → Secrets · Doppler → GitHub Act
 
 | Nombre | IP | vCPU | RAM | Disco | Rol |
 |---|---|---|---|---|---|
-| k8s-cp | 10.10.10.10 | 2 | 4 GB | 40 GB | control plane |
-| k8s-w1 | 10.10.10.11 | 2 | 4 GB | 40 GB | worker |
-| k8s-w2 | 10.10.10.12 | 2 | 4 GB | 40 GB | worker |
-| k8s-w3 | 10.10.10.13 | 2 | 4 GB | 40 GB | worker |
+| k8s-cp | 10.10.10.10 | 2 | 1.25 GB | 25 GB | control plane |
+| k8s-w1 | 10.10.10.11 | 2 | 1.5 GB | 25 GB | worker |
+| k8s-w2 | 10.10.10.12 | 2 | 1.5 GB | 25 GB | worker |
+
+Host: Intel i5-3470S (4 núcleos), 5.66 GB de RAM, Proxmox VE 9.2, `proxmox.grupo7.lab` (192.168.101.50). Por la RAM disponible se usan k3s y 2 workers, como se acordó con el docente (ver [docs/02](docs/02-cluster-kubernetes.md)).
 
 Pool de MetalLB reservado: `10.10.10.200-10.10.10.220`. Creación de las VMs paso a paso en [docs/01-proxmox-y-vms.md](docs/01-proxmox-y-vms.md).
 
@@ -52,10 +52,10 @@ Pool de MetalLB reservado: `10.10.10.200-10.10.10.220`. Creación de las VMs pas
 | # | Paso | Dónde | Comando / documento |
 |---|---|---|---|
 | 1 | Instalar Proxmox VE | computadora física | [docs/01](docs/01-proxmox-y-vms.md#11-instalar-proxmox-ve-inf-01) |
-| 2 | Red del laboratorio y NFS | Shell de Proxmox | `bash scripts/proxmox/red-proxmox.sh wlp2s0` · `bash scripts/proxmox/servidor-nfs.sh` |
-| 3 | Crear las 4 VMs (cloud-init) | Shell de Proxmox | `bash scripts/proxmox/crear-vms.sh` |
+| 2 | Red, reenvío de puertos y NFS | Shell de Proxmox | `bash scripts/proxmox/red-proxmox.sh vmbr0` · `bash scripts/proxmox/publicar-servicios.sh` · `bash scripts/proxmox/servidor-nfs.sh` |
+| 3 | Crear las 3 VMs (cloud-init) | Shell de Proxmox | `bash scripts/proxmox/crear-vms.sh` |
 | 4 | Preparar los nodos | Shell de Proxmox | `bash scripts/proxmox/preparar-nodos.sh` |
-| 5 | Crear el clúster | Shell de Proxmox | `bash scripts/proxmox/instalar-kubernetes.sh` ([docs/02](docs/02-cluster-kubernetes.md)) |
+| 5 | Crear el clúster k3s | Shell de Proxmox | `bash scripts/proxmox/instalar-kubernetes.sh` ([docs/02](docs/02-cluster-kubernetes.md)) |
 | 6 | VPN | Shell de Proxmox | Tailscale como subnet router ([docs/03](docs/03-red-metallb-vpn.md)) |
 | 7 | Secretos en Doppler y GitHub | navegador | [docs/05](docs/05-secretos-doppler.md) |
 | 8 | Primer build de las imágenes | GitHub → Actions | ejecutar `api` y `web` con **Run workflow** |
@@ -75,7 +75,7 @@ k8s/
   argocd/              install (Argo CD con kustomize), ingress, root.yaml y apps/ (app of apps)
 .github/workflows/     api.yml, web.yml y _build-deploy.yml (reutilizable)
 loadtest/              k6-carga.js (prueba del HPA)
-scripts/               proxmox/ (red, NFS, VMs, kubeadm) · nodos/ (preparar nodo, arranque) · configurar.sh
+scripts/               proxmox/ (red, reenvío de puertos, NFS, VMs, k3s) · nodos/ (preparar nodo, arranque) · configurar.sh
 docs/                  01–06 paso a paso, arquitectura, hosts.txt, ia.md, evidencias/
 ```
 
@@ -83,7 +83,7 @@ docs/                  01–06 paso a paso, arquitectura, hosts.txt, ia.md, evid
 
 | Código | Cómo se cumple |
 |---|---|
-| INF-01..06 | Proxmox VE 9.2, 4 VMs desde plantilla cloud-init, IPs fijas, kubeadm, taint del control plane, pool de MetalLB reservado |
+| INF-01..06 | Proxmox VE 9.2, 3 VMs desde plantilla cloud-init (1 control plane + 2 workers, acordado con el docente), IPs fijas, k3s, taint del control plane, pool de MetalLB reservado |
 | APP-01..07 | CRUD + /health + /metrics, web CRUD, PostgreSQL StatefulSet con PVC, Dockerfiles, tag = hash, todo en YAML/Kustomize/Helm, Job db-init |
 | NET-01..05 | MetalLB L2, Traefik LoadBalancer 10.10.10.200, IngressRoute por servicio, IngressRouteTCP para la base, dominios `*.grupo7.lab` |
 | OBS-01..04 | Prometheus (nodos, Kubernetes, API), Loki + Promtail DaemonSet, Grafana con provisioning, dashboard versionado |
@@ -91,7 +91,7 @@ docs/                  01–06 paso a paso, arquitectura, hosts.txt, ia.md, evid
 | PER-01..03 | NFS provisioner + StorageClass por defecto, PVC en Prometheus, Loki, Grafana y PostgreSQL, StatefulSet |
 | CD-01..04 | Un workflow por app con filtro de ruta, Argo CD con IngressRoute, app of apps, prune + selfHeal |
 | SEC-01..04 | Doppler `kubelab/prd`, operator + DopplerSecret, CLI de Doppler en Actions, solo tokens de Doppler a mano |
-| ACC-01..04 | `docs/hosts.txt`, Tailscale, usuarios de solo lectura fuera del repo, esta tabla de URLs |
+| ACC-01..04 | `docs/hosts.txt` (IP de Proxmox + reenvío de puertos), Tailscale, usuarios de solo lectura fuera del repo, esta tabla de URLs |
 
 ## Trabajo en equipo
 

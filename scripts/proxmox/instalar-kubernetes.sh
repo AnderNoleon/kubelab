@@ -1,39 +1,49 @@
 #!/usr/bin/env bash
-# Desde el host Proxmox: crea el clúster con kubeadm (control plane + 3 workers) e instala Flannel.
-# Requiere haber corrido preparar-nodos.sh.   Uso:  bash scripts/proxmox/instalar-kubernetes.sh
+# Desde el host Proxmox: crea el clúster k3s (1 control plane + N workers).
+# Requiere haber corrido preparar-nodos.sh.
+#   bash scripts/proxmox/instalar-kubernetes.sh              (2 workers)
+#   WORKERS=1 bash scripts/proxmox/instalar-kubernetes.sh    (1 worker)
+#
+# Se desactivan los componentes que k3s trae de serie porque el proyecto instala los suyos con Argo CD:
+#   traefik (usamos nuestro Traefik), servicelb (usamos MetalLB),
+#   local-storage (usamos NFS) y metrics-server (lo instala Argo CD).
+# El instalador de k3s usa sudo por su cuenta cuando no corre como root.
+# El control plane lleva el taint NoSchedule: no ejecuta las aplicaciones (INF-05).
 set -euo pipefail
 
+WORKERS="${WORKERS:-2}"
 CP=10.10.10.10
-WORKERS="10.10.10.11 10.10.10.12 10.10.10.13"
 SSH="ssh -o StrictHostKeyChecking=accept-new"
 
-if $SSH "kube@${CP}" "test -f /etc/kubernetes/admin.conf"; then
-  echo ">> El control plane ya estaba inicializado"
+if $SSH "kube@${CP}" "test -f /etc/rancher/k3s/k3s.yaml"; then
+  echo ">> k3s ya estaba instalado en k8s-cp"
 else
-  echo ">> kubeadm init en k8s-cp"
-  $SSH "kube@${CP}" "sudo kubeadm init --apiserver-advertise-address=${CP} --pod-network-cidr=10.244.0.0/16"
+  echo ">> Instalando k3s (server) en k8s-cp"
+  $SSH "kube@${CP}" "curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable sh -s - server \
+    --node-ip ${CP} \
+    --disable traefik --disable servicelb --disable local-storage --disable metrics-server \
+    --node-taint node-role.kubernetes.io/control-plane:NoSchedule \
+    --write-kubeconfig-mode 644"
 fi
 
 echo ">> kubectl para el usuario kube"
-$SSH "kube@${CP}" 'mkdir -p ~/.kube && sudo cp /etc/kubernetes/admin.conf ~/.kube/config && sudo chown $(id -u):$(id -g) ~/.kube/config'
+$SSH "kube@${CP}" 'mkdir -p ~/.kube && cp /etc/rancher/k3s/k3s.yaml ~/.kube/config && chmod 600 ~/.kube/config'
 
-echo ">> Red de pods (Flannel)"
-$SSH "kube@${CP}" "kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
+TOKEN=$($SSH "kube@${CP}" "sudo cat /var/lib/rancher/k3s/server/node-token")
 
-JOIN=$($SSH "kube@${CP}" "sudo kubeadm token create --print-join-command")
-for ip in $WORKERS; do
-  if $SSH "kube@${ip}" "test -f /etc/kubernetes/kubelet.conf"; then
-    echo ">> ${ip} ya pertenece al clúster"
+for i in $(seq 1 "$WORKERS"); do
+  ip="10.10.10.1${i}"
+  if $SSH "kube@${ip}" "systemctl is-active --quiet k3s-agent"; then
+    echo ">> k8s-w${i} ya pertenece al clúster"
   else
-    echo ">> Uniendo ${ip}"
-    $SSH "kube@${ip}" "sudo ${JOIN}"
+    echo ">> Uniendo k8s-w${i} (${ip})"
+    $SSH "kube@${ip}" "curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable K3S_URL=https://${CP}:6443 K3S_TOKEN=${TOKEN} sh -s - agent --node-ip ${ip}"
   fi
 done
 
-echo ">> Etiqueta de rol worker"
-for n in k8s-w1 k8s-w2 k8s-w3; do
-  $SSH "kube@${CP}" "kubectl label node ${n} node-role.kubernetes.io/worker= --overwrite" >/dev/null
+echo ">> Esperando nodos y poniendo el rol worker"
+for i in $(seq 1 "$WORKERS"); do
+  until $SSH "kube@${CP}" "kubectl get node k8s-w${i}" >/dev/null 2>&1; do sleep 5; done
+  $SSH "kube@${CP}" "kubectl label node k8s-w${i} node-role.kubernetes.io/worker=worker --overwrite" >/dev/null
 done
-
-echo ">> Esperando nodos Ready"
 $SSH "kube@${CP}" "kubectl wait --for=condition=Ready node --all --timeout=300s && kubectl get nodes -o wide"

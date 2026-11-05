@@ -31,8 +31,8 @@ spec:
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata   # subcarpeta: el volumen NFS no queda como raíz de datos
           resources:
-            requests: { cpu: 100m, memory: 256Mi }
-            limits: { cpu: "1", memory: 512Mi }
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 384Mi }
           livenessProbe:
             exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
             initialDelaySeconds: 30
