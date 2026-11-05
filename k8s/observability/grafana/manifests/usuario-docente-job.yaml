@@ -1,0 +1,46 @@
+# Crea (o actualiza) el usuario de solo lectura del docente en Grafana (ACC-03).
+# Usuario y clave vienen de Doppler; los usuarios nuevos de Grafana tienen rol Viewer por defecto.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grafana-usuario-docente
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: curl
+          image: curlimages/curl:8.11.1
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              G=http://grafana.monitoring.svc.cluster.local
+              until curl -fs "$G/api/health" >/dev/null; do echo "esperando a Grafana..."; sleep 5; done
+              cuerpo=$(printf '{"name":"Docente","login":"%s","password":"%s"}' "$VIEWER_USER" "$VIEWER_PASS")
+              code=$(curl -s -o /tmp/r -w '%{http_code}' -u "$ADMIN_USER:$ADMIN_PASS" \
+                -H 'Content-Type: application/json' -X POST "$G/api/admin/users" -d "$cuerpo")
+              if [ "$code" = "200" ]; then echo "Usuario $VIEWER_USER creado (Viewer)"; exit 0; fi
+              # Ya existía: se sincroniza la clave con la de Doppler
+              id=$(curl -fs -u "$ADMIN_USER:$ADMIN_PASS" "$G/api/users/lookup?loginOrEmail=$VIEWER_USER" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+              [ -n "$id" ] || { echo "No se pudo crear ni encontrar el usuario (HTTP $code)"; cat /tmp/r; exit 1; }
+              curl -fs -u "$ADMIN_USER:$ADMIN_PASS" -H 'Content-Type: application/json' -X PUT \
+                "$G/api/admin/users/$id/password" -d "$(printf '{"password":"%s"}' "$VIEWER_PASS")" >/dev/null
+              echo "Usuario $VIEWER_USER actualizado"
+          env:
+            - name: ADMIN_USER
+              valueFrom: { secretKeyRef: { name: grafana-secrets, key: GRAFANA_ADMIN_USER } }
+            - name: ADMIN_PASS
+              valueFrom: { secretKeyRef: { name: grafana-secrets, key: GRAFANA_ADMIN_PASSWORD } }
+            - name: VIEWER_USER
+              valueFrom: { secretKeyRef: { name: grafana-secrets, key: GRAFANA_VIEWER_USER } }
+            - name: VIEWER_PASS
+              valueFrom: { secretKeyRef: { name: grafana-secrets, key: GRAFANA_VIEWER_PASSWORD } }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }

@@ -1,0 +1,12 @@
+# Aprovisionador dinámico de almacenamiento (PER-01)
+# El servidor NFS corre en el host Proxmox (scripts/proxmox/servidor-nfs.sh), fuera de las VMs:
+# los datos sobreviven aunque se borre un pod, un PVC archivado o incluso un nodo.
+nfs:
+  server: 10.10.10.1
+  path: /srv/nfs/kubelab
+
+storageClass:
+  name: nfs-client
+  defaultClass: true        # StorageClass por defecto del clúster
+  reclaimPolicy: Delete
+  archiveOnDelete: true     # al borrar un PVC, la carpeta se renombra "archived-..." en vez de borrarse

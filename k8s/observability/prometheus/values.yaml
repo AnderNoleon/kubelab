@@ -1,0 +1,23 @@
+# Prometheus (OBS-01, PER-02)
+# Recolecta: nodos (node-exporter), Kubernetes (kube-state-metrics, kubelet/cAdvisor)
+# y el /metrics de la API (pods con la anotación prometheus.io/scrape: "true").
+alertmanager:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+
+kube-state-metrics:
+  enabled: true
+prometheus-node-exporter:
+  enabled: true
+
+server:
+  retention: 7d
+  persistentVolume:
+    enabled: true            # PVC en la StorageClass por defecto (nfs-client)
+    size: 8Gi
+  resources:
+    requests: { cpu: 100m, memory: 384Mi }
+    limits: { memory: 1Gi }
+  global:
+    scrape_interval: 15s

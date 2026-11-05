@@ -1,0 +1,50 @@
+# Grafana (OBS-03, OBS-04, PER-02)
+# Credenciales: Secret grafana-secrets, sincronizado desde Doppler. Nada de claves en el repo.
+admin:
+  existingSecret: grafana-secrets
+  userKey: GRAFANA_ADMIN_USER
+  passwordKey: GRAFANA_ADMIN_PASSWORD
+
+persistence:
+  enabled: true              # PVC en nfs-client: usuarios y preferencias sobreviven al pod
+  size: 2Gi
+
+deploymentStrategy:
+  type: Recreate
+
+resources:
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { memory: 384Mi }
+
+testFramework:
+  enabled: false
+
+# Fuentes de datos por código (provisioning)
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        isDefault: true
+        editable: false
+      - name: Loki
+        uid: loki
+        type: loki
+        access: proxy
+        url: http://loki.monitoring.svc.cluster.local:3100
+        editable: false
+
+# Dashboards por código: el sidecar carga todo ConfigMap con la etiqueta grafana_dashboard=1
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: monitoring
+    provider:
+      folder: KubeLab
+      allowUiUpdates: false

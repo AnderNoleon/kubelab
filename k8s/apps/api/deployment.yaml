@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels: { app: api, app.kubernetes.io/part-of: kubelab }
+  annotations:
+    secrets.doppler.com/reload: "true"   # se reinicia sola si cambia un secreto en Doppler
+spec:
+  # Sin "replicas": las controla el HorizontalPodAutoscaler (mínimo 2, máximo 6)
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: api }
+  template:
+    metadata:
+      labels: { app: api, app.kubernetes.io/part-of: kubelab }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: /metrics
+    spec:
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: api }
+      containers:
+        - name: api
+          # El pipeline de CI/CD reescribe esta línea con el hash corto del commit. No editar a mano.
+          image: DOCKERHUB_USER/kubelab-api:inicial
+          ports:
+            - { name: http, containerPort: 3000 }
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: kubelab-secrets, key: DATABASE_URL }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 300m, memory: 192Mi }
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 2
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "5"] }   # da tiempo a Traefik de sacar el pod antes de cerrarlo
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000

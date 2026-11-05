@@ -1,0 +1,15 @@
+# Namespaces que necesitan existir antes que el resto (Doppler escribe Secrets en ellos)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubelab
+  labels:
+    app.kubernetes.io/part-of: kubelab
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    # Promtail y node-exporter montan rutas del nodo (hostPath)
+    pod-security.kubernetes.io/enforce: privileged

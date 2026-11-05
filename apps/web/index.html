@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KubeLab · Inventario</title>
+  <style>
+    :root { --fondo:#f3f5f8; --tarjeta:#fff; --texto:#1c2430; --suave:#5e6b7b; --linea:#e3e7ed; --acento:#2459c7; --peligro:#c93636; --ok:#1d8a4f; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background:var(--fondo); color:var(--texto); }
+    header { background:var(--acento); color:#fff; padding:18px 20px; }
+    header h1 { margin:0; font-size:21px; }
+    header p { margin:4px 0 0; font-size:13px; opacity:.9; }
+    main { max-width:920px; margin:0 auto; padding:20px 16px 40px; display:grid; gap:16px; }
+    .tarjeta { background:var(--tarjeta); border-radius:10px; padding:16px 18px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+    h2 { margin:0 0 12px; font-size:16px; }
+    form { display:grid; gap:10px; grid-template-columns: 2fr 1fr 1fr auto auto; align-items:end; }
+    label { display:grid; gap:4px; font-size:12px; color:var(--suave); }
+    input { padding:8px 10px; border:1px solid var(--linea); border-radius:6px; font:inherit; color:var(--texto); }
+    button { padding:8px 14px; border:0; border-radius:6px; font:inherit; cursor:pointer; background:var(--acento); color:#fff; }
+    button.secundario { background:#e9edf3; color:var(--texto); }
+    button.peligro { background:transparent; color:var(--peligro); padding:4px 8px; }
+    button.editar { background:transparent; color:var(--acento); padding:4px 8px; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th, td { text-align:left; padding:9px 6px; border-bottom:1px solid var(--linea); }
+    th { color:var(--suave); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+    th.num, td.num { text-align:right; font-variant-numeric: tabular-nums; }
+    td.acciones { text-align:right; white-space:nowrap; }
+    .tabla { overflow-x:auto; }
+    main > *, form > * { min-width:0; }
+    input { width:100%; min-width:0; }
+    #estado { font-size:13px; color:var(--suave); min-height:18px; }
+    #estado.error { color:var(--peligro); } #estado.ok { color:var(--ok); }
+    @media (max-width: 640px) { form { grid-template-columns: 1fr 1fr; } form label:first-child { grid-column: 1 / -1; } th, td { padding:8px 4px; } button.editar, button.peligro { padding:4px; } td.acciones { white-space:normal; } td.acciones button { display:block; margin-left:auto; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>KubeLab · Inventario</h1>
+    <p>Grupo 7 · web <code>__VERSION__</code> · API: <span id="api-url"></span> (<span id="api-version">…</span>)</p>
+  </header>
+  <main>
+    <section class="tarjeta">
+      <h2 id="titulo-form">Nuevo producto</h2>
+      <form id="form">
+        <label>Nombre <input id="nombre" required maxlength="100"></label>
+        <label>Cantidad <input id="cantidad" type="number" min="0" step="1" required></label>
+        <label>Precio (Q) <input id="precio" type="number" min="0" step="0.01" required></label>
+        <button type="submit" id="guardar">Agregar</button>
+        <button type="button" id="cancelar" class="secundario" hidden>Cancelar</button>
+      </form>
+      <p id="estado"></p>
+    </section>
+    <section class="tarjeta">
+      <h2>Productos</h2>
+      <div class="tabla"><table>
+        <thead><tr><th>ID</th><th>Nombre</th><th class="num">Cantidad</th><th class="num">Precio</th><th></th></tr></thead>
+        <tbody id="lista"><tr><td colspan="5">Cargando…</td></tr></tbody>
+      </table></div>
+    </section>
+  </main>
+  <script>
+    // app.grupo7.lab  ->  api.grupo7.lab  (la web y la API tienen dominios propios)
+    const API = location.hostname.startsWith("app.")
+      ? location.protocol + "//" + location.hostname.replace(/^app\./, "api.")
+      : "http://localhost:3000";
+    document.getElementById("api-url").textContent = API;
+
+    const $ = (id) => document.getElementById(id);
+    let editando = null;
+
+    function estado(texto, tipo) { const e = $("estado"); e.textContent = texto; e.className = tipo || ""; }
+    function escapar(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
+    async function pedir(metodo, ruta, cuerpo) {
+      const r = await fetch(API + ruta, {
+        method: metodo,
+        headers: cuerpo ? { "Content-Type": "application/json" } : {},
+        body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+      });
+      if (r.status === 204) return null;
+      const datos = await r.json();
+      if (!r.ok) throw new Error(datos.errores ? datos.errores.join(", ") : datos.error || "HTTP " + r.status);
+      return datos;
+    }
+
+    async function cargar() {
+      try {
+        const productos = await pedir("GET", "/productos");
+        $("lista").innerHTML = productos.length === 0
+          ? '<tr><td colspan="5">Sin productos.</td></tr>'
+          : productos.map((p) => `<tr>
+              <td>${p.id}</td><td>${escapar(p.nombre)}</td>
+              <td class="num">${p.cantidad}</td><td class="num">Q${Number(p.precio).toFixed(2)}</td>
+              <td class="acciones"><button class="editar" data-id="${p.id}">Editar</button><button class="peligro" data-borrar="${p.id}">Eliminar</button></td>
+            </tr>`).join("");
+        window.__productos = productos;
+      } catch (e) {
+        $("lista").innerHTML = '<tr><td colspan="5">No se pudo conectar con la API.</td></tr>';
+        estado(e.message, "error");
+      }
+    }
+
+    function limpiar() {
+      editando = null; $("form").reset();
+      $("titulo-form").textContent = "Nuevo producto"; $("guardar").textContent = "Agregar"; $("cancelar").hidden = true;
+    }
+
+    $("form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const datos = { nombre: $("nombre").value, cantidad: Number($("cantidad").value), precio: Number($("precio").value) };
+      try {
+        if (editando) { await pedir("PUT", "/productos/" + editando, datos); estado("Producto actualizado.", "ok"); }
+        else { await pedir("POST", "/productos", datos); estado("Producto agregado.", "ok"); }
+        limpiar(); cargar();
+      } catch (e) { estado(e.message, "error"); }
+    });
+
+    $("cancelar").addEventListener("click", () => { limpiar(); estado(""); });
+
+    $("lista").addEventListener("click", async (ev) => {
+      const id = ev.target.dataset.id, borrar = ev.target.dataset.borrar;
+      if (id) {
+        const p = window.__productos.find((x) => String(x.id) === id);
+        editando = p.id; $("nombre").value = p.nombre; $("cantidad").value = p.cantidad; $("precio").value = p.precio;
+        $("titulo-form").textContent = "Editar producto #" + p.id; $("guardar").textContent = "Guardar"; $("cancelar").hidden = false;
+        $("nombre").focus();
+      }
+      if (borrar) {
+        try { await pedir("DELETE", "/productos/" + borrar); estado("Producto eliminado.", "ok"); if (String(editando) === borrar) limpiar(); cargar(); }
+        catch (e) { estado(e.message, "error"); }
+      }
+    });
+
+    pedir("GET", "/health").then((h) => { $("api-version").textContent = h.version; }).catch(() => { $("api-version").textContent = "sin conexión"; });
+    cargar();
+  </script>
+</body>
+</html>

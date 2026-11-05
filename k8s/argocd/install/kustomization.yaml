@@ -1,0 +1,13 @@
+# Instalación de Argo CD (CD-02). Argo CD se administra a sí mismo con este mismo directorio:
+#   1) la primera vez se aplica a mano (arranque):  kubectl apply -k k8s/argocd/install --server-side --force-conflicts
+#   2) desde ahí, la Application "platform-argocd" mantiene cualquier cambio de estos archivos.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argocd
+resources:
+  - namespace.yaml
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.6/manifests/install.yaml
+patches:
+  - path: argocd-cm.yaml
+  - path: argocd-cmd-params-cm.yaml
+  - path: argocd-rbac-cm.yaml

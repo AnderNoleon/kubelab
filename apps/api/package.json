@@ -1,0 +1,16 @@
+{
+  "name": "kubelab-api",
+  "version": "1.0.0",
+  "description": "API de inventario - KubeLab Grupo 7",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "pg": "^8.16.0",
+    "prom-client": "^15.1.3"
+  }
+}

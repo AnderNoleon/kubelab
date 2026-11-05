@@ -1,0 +1,44 @@
+# Aplica el esquema inicial (APP-07). Argo CD lo ejecuta después de cada sincronización (PostSync),
+# cuando PostgreSQL ya está listo. El SQL es idempotente.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app: db-init }
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: psql
+          image: postgres:17-alpine
+          command: ["sh", "-c"]
+          args:
+            - |
+              until pg_isready -d "$DATABASE_URL"; do echo "esperando a PostgreSQL..."; sleep 3; done
+              psql "$DATABASE_URL" \
+                -v ro_user="$DB_READONLY_USER" \
+                -v ro_pass="$DB_READONLY_PASSWORD" \
+                -f /sql/schema.sql
+              echo "Esquema aplicado"
+          env:
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: kubelab-secrets, key: DATABASE_URL } }
+            - name: DB_READONLY_USER
+              valueFrom: { secretKeyRef: { name: kubelab-secrets, key: DB_READONLY_USER } }
+            - name: DB_READONLY_PASSWORD
+              valueFrom: { secretKeyRef: { name: kubelab-secrets, key: DB_READONLY_PASSWORD } }
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          volumeMounts:
+            - { name: sql, mountPath: /sql }
+      volumes:
+        - name: sql
+          configMap: { name: db-schema }

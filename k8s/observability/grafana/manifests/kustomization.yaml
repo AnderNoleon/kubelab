@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - ingressroute.yaml
+  - usuario-docente-job.yaml
+# Dashboard versionado (OBS-04): el archivo JSON vive en el repo y Grafana lo carga solo
+configMapGenerator:
+  - name: dashboard-kubelab
+    files:
+      - dashboards/kubelab.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"

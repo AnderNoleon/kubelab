@@ -1,0 +1,10 @@
+# HA-03: al menos una réplica disponible. Con una sola réplica, esto también impide que un
+# "kubectl drain" saque a PostgreSQL de su nodo sin que lo decidamos (borrar el pod sí funciona).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: postgres }

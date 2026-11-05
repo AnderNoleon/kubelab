@@ -1,0 +1,34 @@
+# Valores del chart de Traefik (NET-02, NET-03, NET-04)
+deployment:
+  replicas: 2
+
+service:
+  # El chart crea el Service como LoadBalancer; MetalLB le asigna esta IP fija
+  annotations:
+    metallb.io/loadBalancerIPs: 10.10.10.200
+
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+
+ports:
+  # Entrypoint TCP para PostgreSQL (lo usa la IngressRouteTCP de k8s/apps/database)
+  postgres:
+    port: 5432
+    expose:
+      default: true
+    exposedPort: 5432
+    protocol: TCP
+
+providers:
+  kubernetesCRD:
+    enabled: true          # IngressRoute e IngressRouteTCP
+    allowCrossNamespace: false
+
+ingressRoute:
+  dashboard:
+    enabled: false
+
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits: { memory: 256Mi }

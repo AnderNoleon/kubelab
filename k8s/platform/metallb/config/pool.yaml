@@ -1,0 +1,27 @@
+# Pool de MetalLB en modo capa 2 (NET-01, INF-06)
+# Rango reservado dentro de la red del laboratorio 10.10.10.0/24 (vmbr1 en Proxmox):
+#   10.10.10.1          host Proxmox (puerta de enlace)
+#   10.10.10.10 - .13   nodos del clúster
+#   10.10.10.200 - .220 RESERVADO para MetalLB (ninguna VM usa estas IPs)
+#   10.10.10.200        Traefik (todas las URLs del grupo 7 y PostgreSQL)
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: pool-grupo7
+  namespace: metallb-system
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  addresses:
+    - 10.10.10.200-10.10.10.220
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: l2-grupo7
+  namespace: metallb-system
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  ipAddressPools:
+    - pool-grupo7

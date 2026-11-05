@@ -1,0 +1,41 @@
+# Generado por scripts/generar-apps-argocd.py
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-traefik
+  namespace: argocd
+  labels:
+    kubelab/componente: plataforma
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+  - repoURL: https://traefik.github.io/charts
+    chart: traefik
+    targetRevision: 42.2.0
+    helm:
+      releaseName: traefik
+      valueFiles:
+      - $values/k8s/platform/traefik/values.yaml
+  - repoURL: REPO_URL
+    targetRevision: main
+    ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traefik
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m
