@@ -1,0 +1,23 @@
+name: api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/api.yml"
+      - ".github/workflows/_build-deploy.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+  workflow_dispatch:
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_build-deploy.yml
+    with:
+      app: api
+      test-command: cd apps/api && npm ci && npm test
+    secrets:
+      DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}

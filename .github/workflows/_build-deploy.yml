@@ -1,0 +1,133 @@
+# Workflow reutilizable: prueba, construye, publica y actualiza el manifiesto de UNA aplicación.
+# Lo llaman api.yml y web.yml (CD-01: un workflow por aplicación, filtrado por ruta).
+#
+# Credenciales (SEC-03): se obtienen de Doppler con la CLI. El único secreto en GitHub es
+# DOPPLER_TOKEN (token de servicio de Doppler, solo lectura de kubelab/prd).
+
+name: _build-deploy
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        description: "Nombre de la aplicación (carpeta en apps/ y en k8s/apps/)"
+        required: true
+        type: string
+      test-command:
+        description: "Comando de pruebas, se ejecuta desde la raíz del repo"
+        required: true
+        type: string
+    secrets:
+      DOPPLER_TOKEN:
+        required: true
+
+jobs:
+  test:
+    name: Pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Ejecutar pruebas
+        run: ${{ inputs.test-command }}
+
+  build:
+    name: Build y push
+    needs: test
+    # En pull requests solo se prueba; se publica únicamente al llegar a main
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      image: ${{ steps.creds.outputs.image }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Etiqueta = hash corto del commit (APP-05, nunca latest)
+        id: tag
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar la CLI de Doppler
+        uses: dopplerhq/cli-action@v4
+
+      - name: Credenciales de Docker Hub desde Doppler
+        id: creds
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          user=$(doppler secrets get DOCKERHUB_USERNAME --plain)
+          token=$(doppler secrets get DOCKERHUB_TOKEN --plain)
+          echo "::add-mask::$token"
+          echo "DOCKERHUB_USERNAME=$user" >> "$GITHUB_ENV"
+          echo "DOCKERHUB_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "image=$user/kubelab-${{ inputs.app }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Construir y publicar
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/${{ inputs.app }}
+          push: true
+          build-args: VERSION=${{ steps.tag.outputs.tag }}
+          tags: ${{ steps.creds.outputs.image }}:${{ steps.tag.outputs.tag }}
+          cache-from: type=gha,scope=${{ inputs.app }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.app }}
+
+      - name: Resumen
+        run: |
+          {
+            echo "## Imagen publicada"
+            echo ""
+            echo "| Aplicación | Imagen | Tag |"
+            echo "|---|---|---|"
+            echo "| ${{ inputs.app }} | \`${{ steps.creds.outputs.image }}\` | \`${{ steps.tag.outputs.tag }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  update-manifest:
+    name: Actualizar k8s/apps/${{ inputs.app }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Un solo commit a la vez aunque api y web terminen juntos
+    concurrency:
+      group: gitops-update
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Reescribir la etiqueta de la imagen
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+          TAG: ${{ needs.build.outputs.tag }}
+          APP: ${{ inputs.app }}
+        run: |
+          archivo="k8s/apps/${APP}/deployment.yaml"
+          sed -i -E "s#(image: ).*/kubelab-${APP}:.*#\1${IMAGE}:${TAG}#" "$archivo"
+          grep -n "image:" "$archivo"
+
+      - name: Commit y push (Argo CD lo detecta y despliega)
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          APP: ${{ inputs.app }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "k8s/apps/${APP}/deployment.yaml"
+          if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
+          git commit -m "ci(${APP}): desplegar imagen ${TAG} [skip ci]"
+          for intento in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            echo "Reintento ${intento}..."; sleep $((intento * 3))
+          done
+          exit 1

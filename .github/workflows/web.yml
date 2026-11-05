@@ -1,0 +1,23 @@
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/web.yml"
+      - ".github/workflows/_build-deploy.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+  workflow_dispatch:
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_build-deploy.yml
+    with:
+      app: web
+      test-command: bash apps/web/test/smoke.sh
+    secrets:
+      DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
