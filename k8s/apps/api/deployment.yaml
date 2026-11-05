@@ -31,7 +31,7 @@ spec:
       containers:
         - name: api
           # El pipeline de CI/CD reescribe esta línea con el hash corto del commit. No editar a mano.
-          image: DOCKERHUB_USER/kubelab-api:inicial
+          image: andernoleo/kubelab-api:5e46bde
           ports:
             - { name: http, containerPort: 3000 }
           env:
