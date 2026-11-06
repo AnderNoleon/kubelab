@@ -1,6 +1,6 @@
 # KubeLab · Grupo 7
 
-Plataforma Kubernetes sobre Proxmox con GitOps: clúster k3s de 3 nodos (1 control plane + 2 workers), una API y una web de inventario con PostgreSQL, despliegue automático con GitHub Actions y Argo CD, observabilidad con Prometheus, Loki, Promtail y Grafana, y secretos gestionados en Doppler.
+Plataforma Kubernetes sobre Proxmox con GitOps: clúster k3s de un solo nodo, una API y una web de inventario con PostgreSQL, despliegue automático con GitHub Actions y Argo CD, observabilidad con Prometheus, Loki, Promtail y Grafana, y secretos gestionados en Doppler.
 
 Integrantes: **Anderson** y **Dennys** · Docente: **COMPLETAR** (colaborador del repositorio)
 
@@ -27,9 +27,7 @@ Ver [docs/arquitectura.md](docs/arquitectura.md) (diagrama y tabla de componente
 
 ```
 Computadora física (192.168.101.50) ── Proxmox VE 9.2 ── red 10.10.10.0/24 (vmbr1, NAT) ── NFS + Tailscale en el host
-   ├── k8s-cp  10.10.10.10   control plane (k3s server, taint NoSchedule)
-   ├── k8s-w1  10.10.10.11   worker
-   └── k8s-w2  10.10.10.12   worker
+   └── k8s-cp  10.10.10.10   control plane + cargas (k3s server, sin taint)
 Navegador → 192.168.101.50:80/5432 (DNAT) → MetalLB 10.10.10.200 → Traefik → app / api / db / grafana / prometheus / argocd .grupo7.lab
 GitHub (código + manifiestos) → Actions → Docker Hub (:hash) → commit del tag → Argo CD → clúster
 Doppler (kubelab/prd) → Doppler Operator → Secrets · Doppler → GitHub Actions
@@ -39,13 +37,11 @@ Doppler (kubelab/prd) → Doppler Operator → Secrets · Doppler → GitHub Act
 
 | Nombre | IP | vCPU | RAM | Disco | Rol |
 |---|---|---|---|---|---|
-| k8s-cp | 10.10.10.10 | 2 | 1.25 GB | 25 GB | control plane |
-| k8s-w1 | 10.10.10.11 | 2 | 1.5 GB | 25 GB | worker |
-| k8s-w2 | 10.10.10.12 | 2 | 1.5 GB | 25 GB | worker |
+| k8s-cp | 10.10.10.10 | 2 | 4 GB | 25 GB | control plane + cargas |
 
-Host: Intel i5-3470S (4 núcleos), 5.66 GB de RAM, Proxmox VE 9.2, `proxmox.grupo7.lab` (192.168.101.50). Por la RAM disponible se usan k3s y 2 workers, como se acordó con el docente (ver [docs/02](docs/02-cluster-kubernetes.md)).
+Host: Intel i5-3470S (4 núcleos), 5.66 GB de RAM, Proxmox VE 9.2, `proxmox.grupo7.lab` (192.168.101.50). Por la RAM del host, el clúster es de un solo nodo con k3s, como se acordó con el docente (ver [docs/02](docs/02-cluster-kubernetes.md#clúster-de-un-solo-nodo)).
 
-Pool de MetalLB reservado: `10.10.10.200-10.10.10.220`. Creación de las VMs paso a paso en [docs/01-proxmox-y-vms.md](docs/01-proxmox-y-vms.md).
+Pool de MetalLB reservado: `10.10.10.200-10.10.10.220`. Creación de la VM paso a paso en [docs/01-proxmox-y-vms.md](docs/01-proxmox-y-vms.md).
 
 ## Reconstruir el entorno desde cero
 
@@ -53,9 +49,9 @@ Pool de MetalLB reservado: `10.10.10.200-10.10.10.220`. Creación de las VMs pas
 |---|---|---|---|
 | 1 | Instalar Proxmox VE | computadora física | [docs/01](docs/01-proxmox-y-vms.md#11-instalar-proxmox-ve-inf-01) |
 | 2 | Red, reenvío de puertos y NFS | Shell de Proxmox | `bash scripts/proxmox/red-proxmox.sh vmbr0` · `bash scripts/proxmox/publicar-servicios.sh` · `bash scripts/proxmox/servidor-nfs.sh` |
-| 3 | Crear las 3 VMs (cloud-init) | Shell de Proxmox | `bash scripts/proxmox/crear-vms.sh` |
-| 4 | Preparar los nodos | Shell de Proxmox | `bash scripts/proxmox/preparar-nodos.sh` |
-| 5 | Crear el clúster k3s | Shell de Proxmox | `bash scripts/proxmox/instalar-kubernetes.sh` ([docs/02](docs/02-cluster-kubernetes.md)) |
+| 3 | Crear la VM (cloud-init) | Shell de Proxmox | `WORKERS=0 RAM_CP=4096 bash scripts/proxmox/crear-vms.sh` |
+| 4 | Preparar el nodo | Shell de Proxmox | `WORKERS=0 bash scripts/proxmox/preparar-nodos.sh` |
+| 5 | Crear el clúster k3s | Shell de Proxmox | `WORKERS=0 bash scripts/proxmox/instalar-kubernetes.sh` ([docs/02](docs/02-cluster-kubernetes.md)) |
 | 6 | VPN | Shell de Proxmox | Tailscale como subnet router ([docs/03](docs/03-red-metallb-vpn.md)) |
 | 7 | Secretos en Doppler y GitHub | navegador | [docs/05](docs/05-secretos-doppler.md) |
 | 8 | Primer build de las imágenes | GitHub → Actions | ejecutar `api` y `web` con **Run workflow** |
@@ -77,13 +73,14 @@ k8s/
 loadtest/              k6-carga.js (prueba del HPA)
 scripts/               proxmox/ (red, reenvío de puertos, NFS, VMs, k3s) · nodos/ (preparar nodo, arranque) · configurar.sh
 docs/                  01–06 paso a paso, arquitectura, hosts.txt, ia.md, evidencias/
+imagenes/              capturas del proceso (índice en docs/evidencias/README.md)
 ```
 
 ## Cumplimiento del enunciado
 
 | Código | Cómo se cumple |
 |---|---|
-| INF-01..06 | Proxmox VE 9.2, 3 VMs desde plantilla cloud-init (1 control plane + 2 workers, acordado con el docente), IPs fijas, k3s, taint del control plane, pool de MetalLB reservado |
+| INF-01..06 | Proxmox VE 9.2, VM desde plantilla cloud-init, IP fija, k3s, un solo nodo por recursos del host (acordado con el docente), pool de MetalLB reservado |
 | APP-01..07 | CRUD + /health + /metrics, web CRUD, PostgreSQL StatefulSet con PVC, Dockerfiles, tag = hash, todo en YAML/Kustomize/Helm, Job db-init |
 | NET-01..05 | MetalLB L2, Traefik LoadBalancer 10.10.10.200, IngressRoute por servicio, IngressRouteTCP para la base, dominios `*.grupo7.lab` |
 | OBS-01..04 | Prometheus (nodos, Kubernetes, API), Loki + Promtail DaemonSet, Grafana con provisioning, dashboard versionado |

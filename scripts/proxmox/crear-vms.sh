@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Crea la plantilla Ubuntu 24.04 con cloud-init y clona los nodos del clúster (INF-02, INF-03).
-# Por defecto: 1 control plane + 2 workers (ajustado a un host de 6 GB de RAM).
+# Por defecto: 1 control plane + 2 workers. El clúster del grupo 7 es de un solo nodo (host de 5.66 GB):
+#   WORKERS=0 RAM_CP=4096 bash scripts/proxmox/crear-vms.sh
 # Ejecutar en la Shell de Proxmox como root:   bash scripts/proxmox/crear-vms.sh
 # Variables opcionales:
-#   WORKERS=2         cantidad de workers (1 a 3)
+#   WORKERS=2         cantidad de workers (0 a 3; 0 = un solo nodo que ejecuta todo)
 #   RAM_CP=1280       RAM del control plane en MB
 #   RAM_WORKER=1536   RAM de cada worker en MB
 #   DISCO=25G         tamaño de disco de cada nodo
@@ -25,7 +26,7 @@ PLANTILLA=9000
 IMAGEN=/var/lib/vz/template/iso/noble-server-cloudimg-amd64.img
 URL_IMAGEN=https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
 
-[[ "$WORKERS" =~ ^[1-3]$ ]] || { echo "WORKERS debe ser 1, 2 o 3"; exit 1; }
+[[ "$WORKERS" =~ ^[0-3]$ ]] || { echo "WORKERS debe ser 0, 1, 2 o 3"; exit 1; }
 
 # Llave SSH del host Proxmox: con ella se entra a los nodos sin contraseña
 [[ -f /root/.ssh/id_ed25519 ]] || ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519

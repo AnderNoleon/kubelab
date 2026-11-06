@@ -4,14 +4,12 @@
 
 | VM ID | Nombre | Rol | IP | vCPU | RAM | Disco | Sistema |
 |---|---|---|---|---|---|---|---|
-| 110 | k8s-cp | control plane | 10.10.10.10 | 2 | 1.25 GB | 25 GB | Ubuntu 24.04 (cloud image) + k3s |
-| 111 | k8s-w1 | worker | 10.10.10.11 | 2 | 1.5 GB | 25 GB | Ubuntu 24.04 (cloud image) + k3s |
-| 112 | k8s-w2 | worker | 10.10.10.12 | 2 | 1.5 GB | 25 GB | Ubuntu 24.04 (cloud image) + k3s |
+| 110 | k8s-cp | control plane + cargas | 10.10.10.10 | 2 | 4 GB | 25 GB | Ubuntu 24.04 (cloud image) + k3s |
 | 9000 | ubuntu-2404-plantilla | plantilla cloud-init | — | 2 | — | — | Ubuntu 24.04 (cloud image) |
 
 Host físico: Intel Core i5-3470S (4 núcleos, 2.9 GHz), 5.66 GB de RAM, disco de **COMPLETAR** GB · Proxmox VE 9.2 · hostname `proxmox.grupo7.lab` · IP `192.168.101.50` (cable, `vmbr0`).
 
-Por la RAM disponible se usan 2 workers (acordado con el docente). Con 1 solo worker: `WORKERS=1 RAM_WORKER=2560`. Si el host tuviera más RAM, se puede subir `RAM_WORKER`.
+Por la RAM del host (5.66 GB, de los que Proxmox usa cerca de 1.5 GB), el clúster quedó en **un solo nodo**, `k8s-cp`, que es control plane y además ejecuta todas las cargas (acordado con el docente; ver [docs/02](02-cluster-kubernetes.md#clúster-de-un-solo-nodo)). Los scripts siguen aceptando workers (`WORKERS=1..3`) por si se dispone de un host con más memoria.
 
 ## 1.1 Instalar Proxmox VE (INF-01)
 
@@ -55,8 +53,9 @@ Exporta `/srv/nfs/kubelab` a `10.10.10.0/24`. Lo usa el aprovisionador `nfs-subd
 En la Shell de Proxmox, con el repo clonado (`apt install git && git clone <repo>`):
 
 ```bash
-bash scripts/proxmox/crear-vms.sh
-# opcional: WORKERS=1 RAM_WORKER=2560  STORAGE=local-zfs  CLAVE_VM=algo
+WORKERS=0 RAM_CP=4096 bash scripts/proxmox/crear-vms.sh
+# opcional: STORAGE=local-zfs  CLAVE_VM=algo
+# con más RAM en el host: WORKERS=2 (agrega k8s-w1 y k8s-w2 con RAM_WORKER MB cada uno)
 ```
 
 Qué hace, paso a paso (equivalente a hacerlo en la interfaz web):
@@ -67,15 +66,17 @@ Qué hace, paso a paso (equivalente a hacerlo en la interfaz web):
 4. Importa la imagen como disco `scsi0` y agrega el disco de cloud-init (`ide2`).
 5. Configura cloud-init: usuario `kube`, llave SSH del host, DNS `8.8.8.8`, dominio `grupo7.lab`.
 6. La convierte en plantilla.
-7. Por cada nodo: **Full Clone**, RAM según la tabla, IP fija con `ipconfig0` (gateway 10.10.10.1), arranque automático, disco ampliado a 25 GB y encendido.
-8. Espera a que todos respondan por SSH.
+7. Por cada nodo (con `WORKERS=0`, solo `k8s-cp`): **Full Clone**, RAM según la tabla, IP fija con `ipconfig0` (gateway 10.10.10.1), arranque automático, disco ampliado a 25 GB y encendido.
+8. Espera a que el nodo responda por SSH.
 
-El hostname de cada VM lo pone cloud-init con el nombre de la VM. Comprobar: `ssh kube@10.10.10.11 hostname`.
+El hostname de cada VM lo pone cloud-init con el nombre de la VM. Comprobar: `ssh kube@10.10.10.10 hostname`.
 
 ## 1.5 Preparar los nodos
 
 ```bash
-bash scripts/proxmox/preparar-nodos.sh
+WORKERS=0 bash scripts/proxmox/preparar-nodos.sh
 ```
 
-Ejecuta `scripts/nodos/preparar-nodo.sh` en los 3 nodos: desactiva swap, instala `nfs-common` (para los volúmenes NFS) y registra los nombres de los nodos. k3s trae su propio containerd, así que no hace falta instalarlo aparte.
+Ejecuta `scripts/nodos/preparar-nodo.sh` en el nodo (y en los workers, si los hay): desactiva swap, instala `nfs-common` (para los volúmenes NFS) y registra los nombres de los nodos. k3s trae su propio containerd, así que no hace falta instalarlo aparte.
+
+Evidencia: [creación de las VMs con `crear-vms.sh` (primer intento, con workers)](../imagenes/WhatsApp%20Image%202026-11-04%20at%2011.50.02%20PM.jpeg).

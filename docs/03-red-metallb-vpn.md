@@ -7,7 +7,7 @@
 | 192.168.101.0/24 | Red del grupo (donde se conectan las computadoras). Proxmox: **192.168.101.50** (`vmbr0`, cable) |
 | 10.10.10.0/24 | Red del laboratorio (bridge `vmbr1` en Proxmox, con NAT hacia `vmbr0`) |
 | 10.10.10.1 | Proxmox dentro del laboratorio: puerta de enlace, NFS y router de Tailscale |
-| 10.10.10.10 – 10.10.10.12 | Nodos del clúster (control plane + 2 workers) |
+| 10.10.10.10 | Nodo del clúster `k8s-cp` (control plane que también ejecuta las cargas) |
 | 10.10.10.200 – 10.10.10.220 | **Reservado para MetalLB** (INF-06). Ninguna VM usa estas IPs |
 | 10.10.10.200 | Traefik: todas las URLs del grupo y PostgreSQL (puerto 5432) |
 
@@ -64,3 +64,5 @@ tailscale up --advertise-routes=10.10.10.0/24 --accept-dns=false
 1. Abrir el enlace que imprime e iniciar sesión con la cuenta del grupo.
 2. En https://login.tailscale.com/admin/machines → la máquina `proxmox` → **Edit route settings** → aprobar `10.10.10.0/24`. Luego **Disable key expiry**.
 3. Invitar al docente: **Users → Invite users**. El docente instala Tailscale, inicia sesión (en Linux, con `sudo tailscale up --accept-routes`) y usa la opción B de `docs/hosts.txt` (`10.10.10.200`).
+
+Evidencia: [StorageClass `nfs-client` por defecto y Service de Traefik con `EXTERNAL-IP 10.10.10.200`](../imagenes/WhatsApp%20Image%202026-11-05%20at%208.08.52%20PM.jpeg).

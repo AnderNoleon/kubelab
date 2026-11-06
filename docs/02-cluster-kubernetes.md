@@ -2,7 +2,7 @@
 
 ## Por qué k3s
 
-La computadora asignada tiene **4 núcleos (i5-3470S) y 5.66 GB de RAM**, y Proxmox usa cerca de 1.5 GB. Con lo que queda (unos 4 GB) hay que levantar 3 nodos más Argo CD, Prometheus, Loki, Grafana, PostgreSQL y las aplicaciones. Por eso, de acuerdo con el docente, se usa una distribución liviana y 2 workers.
+La computadora asignada tiene **4 núcleos (i5-3470S) y 5.66 GB de RAM**, y Proxmox usa cerca de 1.5 GB. Con lo que queda (unos 4 GB) hay que levantar el clúster más Argo CD, Prometheus, Loki, Grafana, PostgreSQL y las aplicaciones. Por eso, de acuerdo con el docente, se usa una distribución liviana y un solo nodo (ver [Clúster de un solo nodo](#clúster-de-un-solo-nodo)).
 
 | Opción | A favor | En contra | Decisión |
 |---|---|---|---|
@@ -14,55 +14,76 @@ k3s se instala con:
 
 ```
 --disable traefik --disable servicelb --disable local-storage --disable metrics-server
---node-taint node-role.kubernetes.io/control-plane:NoSchedule
 ```
 
-Así, todo lo que corre en el clúster lo define el repositorio (GitOps), igual que con kubeadm.
+Así, todo lo que corre en el clúster lo define el repositorio (GitOps).
 
 Versión: canal **stable** de k3s, con containerd y Flannel (VXLAN) incluidos.
+
+## Clúster de un solo nodo
+
+| Nombre | IP | vCPU | RAM | Disco | Rol |
+|---|---|---|---|---|---|
+| k8s-cp | 10.10.10.10 | 2 | 4 GB | 25 GB | control plane que también ejecuta todas las cargas |
+
+El diseño original era 1 control plane + workers. Se intentó dos veces:
+
+1. **1 control plane + 2 workers** (1.25 GB + 1.5 GB + 1.5 GB): los tres nodos quedaron `Ready` ([captura](../imagenes/WhatsApp%20Image%202026-11-04%20at%2011.57.43%20PM.jpeg)), pero al desplegar la plataforma la memoria del host se saturó.
+2. **1 control plane + 1 worker** (se eliminó `k8s-w2`, [captura](../imagenes/WhatsApp%20Image%202026-11-05%20at%208.06.26%20PM.jpeg)): el host siguió al límite, con la RAM al 95 % ([captura](../imagenes/WhatsApp%20Image%202026-11-05%20at%208.23.20%20PM.jpeg)).
+
+Cada VM extra repite el sistema operativo, el kubelet y los DaemonSets, y con 5.66 GB en el host esa sobrecarga no cabe. Por eso, **de acuerdo con el docente**, el clúster quedó en un solo nodo con 4 GB: `k8s-cp`. Ya no existen `k8s-w1` ni `k8s-w2`.
+
+Para que el control plane ejecute las aplicaciones se le quitó el taint `node-role.kubernetes.io/control-plane:NoSchedule`, tanto del servicio de k3s (para que no vuelva al reiniciar) como del nodo:
+
+```bash
+# en k8s-cp
+sudo sed -i "/--node-taint/d; /control-plane:NoSchedule/d" /etc/systemd/system/k3s.service
+sudo systemctl daemon-reload && sudo systemctl restart k3s
+kubectl taint nodes k8s-cp node-role.kubernetes.io/control-plane:NoSchedule-
+```
 
 ## Instalación
 
 Desde la Shell de Proxmox:
 
 ```bash
-bash scripts/proxmox/instalar-kubernetes.sh            # 2 workers
-WORKERS=1 bash scripts/proxmox/instalar-kubernetes.sh  # si solo hay 1 worker
+WORKERS=0 bash scripts/proxmox/instalar-kubernetes.sh   # un solo nodo (configuración actual)
+WORKERS=2 bash scripts/proxmox/instalar-kubernetes.sh   # con workers, si el host tiene más RAM
 ```
 
-Equivale a:
+Con `WORKERS=0` el script no agrega el taint al control plane ni espera workers. Equivale a:
 
 ```bash
 # en k8s-cp
 curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable sh -s - server --node-ip 10.10.10.10 \
   --disable traefik --disable servicelb --disable local-storage --disable metrics-server \
-  --node-taint node-role.kubernetes.io/control-plane:NoSchedule --write-kubeconfig-mode 644
-sudo cat /var/lib/rancher/k3s/server/node-token      # copiar el token
-
-# en k8s-w1 y k8s-w2
-curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable K3S_URL=https://10.10.10.10:6443 K3S_TOKEN=<token> sh -s - agent --node-ip 10.10.10.1X
-
-# en k8s-cp
-kubectl label node k8s-w1 node-role.kubernetes.io/worker=worker
-kubectl label node k8s-w2 node-role.kubernetes.io/worker=worker
+  --write-kubeconfig-mode 644
 ```
+
+Con `WORKERS>=1` el script, además, agrega `--node-taint node-role.kubernetes.io/control-plane:NoSchedule` al servidor, une cada worker (`k8s-w1`, `k8s-w2`, ...) con el token de `/var/lib/rancher/k3s/server/node-token` y les pone el rol `worker`.
 
 ## Verificación
 
 ```bash
 ssh kube@10.10.10.10
 kubectl get nodes -o wide
+kubectl describe node k8s-cp | grep Taints
 ```
 
-Resultado esperado: 3 nodos en `Ready`, `k8s-cp` con rol `control-plane` y los otros dos con rol `worker`.
+Resultado esperado: 1 nodo en `Ready`, `k8s-cp` con rol `control-plane`, y `Taints: <none>`.
 
-## El control plane no ejecuta aplicaciones (INF-05)
+## Dónde corren las aplicaciones (INF-05)
 
-`k8s-cp` tiene el taint `node-role.kubernetes.io/control-plane:NoSchedule`, así que api, web, postgres y las herramientas solo se programan en los workers. Comprobar:
+Con un solo nodo, el control plane ejecuta las aplicaciones: api, web, postgres y las herramientas de plataforma y observabilidad se programan en `k8s-cp`. Comprobar:
 
 ```bash
-kubectl describe node k8s-cp | grep Taints
-kubectl get pods -n kubelab -o wide        # columna NODE: solo k8s-w1 y k8s-w2
+kubectl get pods -A -o wide        # columna NODE: k8s-cp en todos
 ```
 
-Los únicos pods de `k8s-cp` son los DaemonSets de observabilidad (Promtail y node-exporter), que deben correr en todos los nodos para recoger sus logs y métricas.
+Separar el control plane de las cargas es la práctica recomendada, y el repositorio lo deja preparado: con un host con más RAM se crean workers (`WORKERS=2` en `crear-vms.sh`, `preparar-nodos.sh` e `instalar-kubernetes.sh`) y se vuelve a poner el taint:
+
+```bash
+kubectl taint nodes k8s-cp node-role.kubernetes.io/control-plane:NoSchedule
+```
+
+Desde ese momento, api, web, postgres y las herramientas solo se programan en los workers, y en `k8s-cp` quedan únicamente los DaemonSets de observabilidad (Promtail y node-exporter, que tienen toleration).

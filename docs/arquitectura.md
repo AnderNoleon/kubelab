@@ -15,9 +15,7 @@ flowchart LR
     TS["Tailscale<br/>subnet router"]
     DNAT["DNAT :80 :5432<br/>192.168.101.50"]
     subgraph RED["Red del laboratorio 10.10.10.0/24 (vmbr1)"]
-      CP["k8s-cp<br/>control plane"]
-      W1["k8s-w1"]
-      W2["k8s-w2"]
+      CP["k8s-cp · 10.10.10.10<br/>control plane + cargas"]
       LB{{"MetalLB<br/>10.10.10.200"}}
       TR["Traefik<br/>IngressRoute / IngressRouteTCP"]
       APPS["web · api · postgres"]

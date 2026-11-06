@@ -22,16 +22,18 @@ kubectl wait --for=condition=Ready pod/postgres-0 -n kubelab --timeout=120s
 curl http://api.grupo7.lab/productos     # "Prueba" sigue ahí
 ```
 
+PostgreSQL tiene una `startupProbe` (`k8s/apps/database/statefulset.yaml`, hasta 60 intentos cada 10 s): la primera inicialización de la base sobre NFS tarda varios minutos y, sin ella, la liveness probe reiniciaba el pod antes de que terminara. La liveness solo empieza a actuar cuando la startupProbe pasa.
+
 ## Observabilidad (OBS-01 a OBS-04)
 
 - **Prometheus** (chart 29.40.3) recolecta:
-  - de los nodos: node-exporter, DaemonSet en los 3 nodos;
+  - del nodo: node-exporter, DaemonSet (1 pod, en `k8s-cp`);
   - de Kubernetes: kube-state-metrics, kubelet y cAdvisor;
   - de la API: los pods con la anotación `prometheus.io/scrape: "true"` en el puerto 3000, ruta `/metrics`.
 
   Se verifica en http://prometheus.grupo7.lab/targets.
-- **Loki** (monolítico, PVC) y **Promtail** (DaemonSet, también en el control plane, con toleration). Se verifica con `kubectl get pods -n monitoring -l app=promtail -o wide`: debe haber 3 pods, uno por nodo.
-- **Grafana** (chart 14.3.0): las fuentes Prometheus y Loki se definen en `values.yaml`, y el dashboard `KubeLab · Grupo 7` se carga desde `k8s/observability/grafana/manifests/dashboards/kubelab.json` con el sidecar. No hay nada configurado a mano.
+- **Loki** (monolítico, PVC) y **Promtail** (DaemonSet, también en el control plane, con toleration). Se verifica con `kubectl get pods -n monitoring -l app=promtail -o wide`: debe haber 1 pod, en `k8s-cp` (uno por nodo).
+- **Grafana** (chart 14.3.0): las fuentes Prometheus y Loki se definen en `values.yaml`, y el dashboard `KubeLab · Grupo 7` se carga desde `k8s/observability/grafana/manifests/dashboards/kubelab.json` con el sidecar. No hay nada configurado a mano. El límite de memoria del contenedor es de **448Mi** (`k8s/observability/grafana/values.yaml`): con un valor menor se reiniciaba por `OOMKilled`.
 
 Paneles del dashboard: peticiones por segundo, réplicas disponibles de api y web, nodos Ready, solicitudes por segundo por ruta y código, latencia p95, CPU y memoria por pod, réplicas activas frente al objetivo del HPA, CPU de los nodos y logs de Loki.
 
@@ -44,6 +46,8 @@ Paneles del dashboard: peticiones por segundo, réplicas disponibles de api y we
 | PodDisruptionBudget | `pdb.yaml` con `minAvailable: 1` |
 | metrics-server + HPA de 2 a 6 por CPU | `k8s/platform/metrics-server`, `hpa.yaml` (objetivo 50 % de CPU) |
 | Prueba de carga | `loadtest/k6-carga.js` |
+
+Con un solo nodo, las 2 réplicas y el PDB protegen frente a la caída o el reemplazo de **un pod** (un reinicio, un despliegue, un `kubectl delete pod`), no frente a la caída del nodo: si `k8s-cp` se apaga, se detiene todo el clúster. Para tolerar la caída de un nodo hacen falta workers (ver [docs/02](02-cluster-kubernetes.md#dónde-corren-las-aplicaciones-inf-05)).
 
 ### Demostración del escalado (HA-05)
 
