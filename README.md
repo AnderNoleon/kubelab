@@ -19,6 +19,9 @@ Requisitos: estar en la misma red que Proxmox (`192.168.101.50`) y tener [`docs/
 | http://prometheus.grupo7.lab | Prometheus | Status → Targets: nodos, kube-state-metrics y la API en `UP` |
 | http://argocd.grupo7.lab | Argo CD | 18 Applications (root + 17) en `Synced` y `Healthy` |
 
+![Web de inventario en app.grupo7.lab](imagenes/WhatsApp%20Image%202026-11-05%20at%209.33.57%20PM.jpeg)
+*http://app.grupo7.lab con la lista de productos; en el encabezado, la versión `5e46bde` de la web y de la API.*
+
 Las credenciales de solo lectura (base de datos, Grafana y Argo CD) se entregan al docente por un canal privado (ACC-03).
 
 ## Arquitectura
@@ -73,7 +76,7 @@ k8s/
 loadtest/              k6-carga.js (prueba del HPA)
 scripts/               proxmox/ (red, reenvío de puertos, NFS, VMs, k3s) · nodos/ (preparar nodo, arranque) · configurar.sh
 docs/                  01–06 paso a paso, arquitectura, hosts.txt, ia.md, evidencias/
-imagenes/              capturas del proceso (índice en docs/evidencias/README.md)
+imagenes/              capturas del proceso, usadas en los documentos (índice en docs/evidencias/README.md)
 ```
 
 ## Cumplimiento del enunciado

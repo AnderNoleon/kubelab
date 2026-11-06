@@ -79,4 +79,5 @@ WORKERS=0 bash scripts/proxmox/preparar-nodos.sh
 
 Ejecuta `scripts/nodos/preparar-nodo.sh` en el nodo (y en los workers, si los hay): desactiva swap, instala `nfs-common` (para los volúmenes NFS) y registra los nombres de los nodos. k3s trae su propio containerd, así que no hace falta instalarlo aparte.
 
-Evidencia: [creación de las VMs con `crear-vms.sh` (primer intento, con workers)](../imagenes/WhatsApp%20Image%202026-11-04%20at%2011.50.02%20PM.jpeg).
+![crear-vms.sh y preparar-nodos.sh en la Shell de Proxmox](../imagenes/WhatsApp%20Image%202026-11-04%20at%2011.50.02%20PM.jpeg)
+*Salida de `crear-vms.sh` (VMs clonadas con cloud-init e IP fija) y de `preparar-nodos.sh`. Captura del primer intento, cuando el clúster tenía workers.*

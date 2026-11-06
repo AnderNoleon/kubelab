@@ -28,8 +28,17 @@ Versión: canal **stable** de k3s, con containerd y Flannel (VXLAN) incluidos.
 
 El diseño original era 1 control plane + workers. Se intentó dos veces:
 
-1. **1 control plane + 2 workers** (1.25 GB + 1.5 GB + 1.5 GB): los tres nodos quedaron `Ready` ([captura](../imagenes/WhatsApp%20Image%202026-11-04%20at%2011.57.43%20PM.jpeg)), pero al desplegar la plataforma la memoria del host se saturó.
-2. **1 control plane + 1 worker** (se eliminó `k8s-w2`, [captura](../imagenes/WhatsApp%20Image%202026-11-05%20at%208.06.26%20PM.jpeg)): el host siguió al límite, con la RAM al 95 % ([captura](../imagenes/WhatsApp%20Image%202026-11-05%20at%208.23.20%20PM.jpeg)).
+1. **1 control plane + 2 workers** (1.25 GB + 1.5 GB + 1.5 GB): los tres nodos quedaron `Ready`, pero al desplegar la plataforma la memoria del host se saturó.
+2. **1 control plane + 1 worker** (se eliminó `k8s-w2`): el host siguió al límite, con la RAM al 95 %.
+
+![Primer intento: tres nodos Ready](../imagenes/WhatsApp%20Image%202026-11-04%20at%2011.57.43%20PM.jpeg)
+*Primer intento: `instalar-kubernetes.sh` termina con k8s-cp, k8s-w1 y k8s-w2 en `Ready`.*
+
+![Segundo intento: se elimina k8s-w2](../imagenes/WhatsApp%20Image%202026-11-05%20at%208.06.26%20PM.jpeg)
+*Segundo intento: `kubectl delete node k8s-w2`; quedan k8s-cp y k8s-w1.*
+
+![RAM del host al 95 %](../imagenes/WhatsApp%20Image%202026-11-05%20at%208.23.20%20PM.jpeg)
+*Resumen de Proxmox durante el segundo intento: 5.40 de 5.66 GiB de RAM en uso. Por esto el clúster quedó en un solo nodo.*
 
 Cada VM extra repite el sistema operativo, el kubelet y los DaemonSets, y con 5.66 GB en el host esa sobrecarga no cabe. Por eso, **de acuerdo con el docente**, el clúster quedó en un solo nodo con 4 GB: `k8s-cp`. Ya no existen `k8s-w1` ni `k8s-w2`.
 
@@ -85,5 +94,8 @@ Separar el control plane de las cargas es la práctica recomendada, y el reposit
 ```bash
 kubectl taint nodes k8s-cp node-role.kubernetes.io/control-plane:NoSchedule
 ```
+
+![Taint NoSchedule en k8s-cp con workers](../imagenes/WhatsApp%20Image%202026-11-05%20at%2012.00.33%20AM.jpeg)
+*Así quedaba el control plane cuando el clúster tenía workers: taint `NoSchedule` en k8s-cp.*
 
 Desde ese momento, api, web, postgres y las herramientas solo se programan en los workers, y en `k8s-cp` quedan únicamente los DaemonSets de observabilidad (Promtail y node-exporter, que tienen toleration).

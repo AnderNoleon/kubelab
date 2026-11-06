@@ -14,6 +14,15 @@
 - Las credenciales de Docker Hub salen de Doppler (ver `05-secretos-doppler.md`).
 - El commit del bot lleva `[skip ci]` y no toca `apps/`, así que no dispara otro pipeline.
 
+![Run de GitHub Actions del workflow web](../imagenes/WhatsApp%20Image%202026-11-05%20at%2012.43.31%20AM.jpeg)
+*Run del workflow `web`: pruebas → build y push → actualizar `k8s/apps/web`, con el resumen "Imagen publicada" (`andernoleo/kubelab-web:5e46bde`).*
+
+![Repositorios en Docker Hub](../imagenes/WhatsApp%20Image%202026-11-05%20at%2012.44.23%20AM.jpeg)
+*Docker Hub: repositorios `andernoleo/kubelab-web` y `andernoleo/kubelab-api`.*
+
+![Commits del bot de GitHub Actions](../imagenes/WhatsApp%20Image%202026-11-05%20at%2012.44.55%20AM.jpeg)
+*Commits `ci(web)` y `ci(api): desplegar imagen 5e46bde [skip ci]` hechos por `github-actions[bot]`.*
+
 ## Argo CD
 
 ### Arranque (única vez, en k8s-cp)
@@ -28,6 +37,9 @@ El script:
 1. Instala Argo CD v3.5.6 desde `k8s/argocd/install` (kustomize: manifiesto oficial + cuenta `docente` + modo HTTP detrás de Traefik).
 2. Pide el token de servicio de Doppler y crea el Secret `doppler-token-secret` (único secreto manual).
 3. Aplica `k8s/argocd/root.yaml`.
+
+![Ejecución de arranque-argocd.sh](../imagenes/WhatsApp%20Image%202026-11-05%20at%2012.57.46%20AM.jpeg)
+*`scripts/nodos/arranque-argocd.sh` en k8s-cp instalando Argo CD.*
 
 Desde ese momento **nadie ejecuta `kubectl apply`**: todo lo despliega Argo CD desde Git.
 
@@ -44,6 +56,12 @@ Desde ese momento **nadie ejecuta `kubectl apply`**: todo lo despliega Argo CD d
 | 3 | platform-argocd-ingress, observability-prometheus, observability-loki |
 | 4 | observability-promtail, observability-grafana, database |
 | 5 | api, web |
+
+![Argo CD con 18 Applications Synced y Healthy](../imagenes/WhatsApp%20Image%202026-11-05%20at%209.29.50%20PM.jpeg)
+*Argo CD: 18 Applications `Synced` y 18 `Healthy` (filtros de la izquierda).*
+
+![Lista de Applications en Argo CD](../imagenes/WhatsApp%20Image%202026-11-05%20at%209.30.01%20PM.jpeg)
+*Vista de lista: origen (repo o chart con su versión), destino y estado de cada Application.*
 
 Todas tienen `automated: {prune: true, selfHeal: true}` (CD-04). Prueba de selfHeal:
 

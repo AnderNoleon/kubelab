@@ -30,6 +30,9 @@
 | prometheus.grupo7.lab | IngressRoute | `k8s/observability/prometheus/manifests/ingressroute.yaml` |
 | argocd.grupo7.lab | IngressRoute | `k8s/argocd/ingress/ingressroute.yaml` |
 
+![StorageClass nfs-client y Service de Traefik con IP de MetalLB](../imagenes/WhatsApp%20Image%202026-11-05%20at%208.08.52%20PM.jpeg)
+*`kubectl get svc -n traefik`: el Service `LoadBalancer` de Traefik recibe de MetalLB la IP `10.10.10.200` (arriba, la StorageClass `nfs-client` por defecto).*
+
 ## Acceso desde la red del grupo (ACC-01)
 
 ```mermaid
@@ -64,5 +67,3 @@ tailscale up --advertise-routes=10.10.10.0/24 --accept-dns=false
 1. Abrir el enlace que imprime e iniciar sesión con la cuenta del grupo.
 2. En https://login.tailscale.com/admin/machines → la máquina `proxmox` → **Edit route settings** → aprobar `10.10.10.0/24`. Luego **Disable key expiry**.
 3. Invitar al docente: **Users → Invite users**. El docente instala Tailscale, inicia sesión (en Linux, con `sudo tailscale up --accept-routes`) y usa la opción B de `docs/hosts.txt` (`10.10.10.200`).
-
-Evidencia: [StorageClass `nfs-client` por defecto y Service de Traefik con `EXTERNAL-IP 10.10.10.200`](../imagenes/WhatsApp%20Image%202026-11-05%20at%208.08.52%20PM.jpeg).

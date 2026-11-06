@@ -2,6 +2,9 @@
 
 **Ninguna credencial está en este repositorio ni en su historial.** Todas viven en Doppler, proyecto `kubelab`, configuración `prd`.
 
+![Proyecto kubelab en Doppler](../imagenes/WhatsApp%20Image%202026-11-05%20at%2012.05.57%20AM.jpeg)
+*Proyecto `kubelab` en Doppler; el clúster y GitHub Actions leen la config `prd`.*
+
 ## Secretos en Doppler (SEC-01)
 
 | Nombre | Ejemplo / regla | Lo usa |
