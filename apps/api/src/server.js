@@ -68,7 +68,8 @@ async function manejar(req, res, ruta, id) {
 
   if (ruta === "/health" && m === "GET") {
     // Liveness: el proceso responde. No depende de la base para no reiniciar pods por una caída de la base.
-    return enviar(res, 200, { status: "ok", version: VERSION });
+    // return enviar(res, 200, { status: "ok", version: VERSION });
+    return enviar(res, 200, { status: "ok", version: VERSION, uptime: Math.round(process.uptime()) });
   }
 
   if (ruta === "/ready" && m === "GET") {
