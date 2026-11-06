@@ -33,10 +33,15 @@ spec:
           resources:
             requests: { cpu: 50m, memory: 128Mi }
             limits: { cpu: "1", memory: 384Mi }
+          # La primera inicialización sobre NFS tarda varios minutos: hasta 10 min antes de que actúe la liveness
+          startupProbe:
+            exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
+            periodSeconds: 10
+            failureThreshold: 60
           livenessProbe:
             exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
-            initialDelaySeconds: 30
             periodSeconds: 10
+            failureThreshold: 6
           readinessProbe:
             exec: { command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""] }
             initialDelaySeconds: 5
